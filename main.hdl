@@ -1,0 +1,51 @@
+CHIP Memory20K {
+    IN in[16], load, address[15];
+    OUT out[16];
+
+    PARTS:
+    // Декодирование старших битов адреса
+    Not(in=address[14], out=not14);
+    Not(in=address[13], out=not13);
+    Not(in=address[12], out=not12);
+    
+    // RAM16K: адреса 0-16383 (address[14]=0)
+    And(a=load, b=not14, out=loadRAM16K);
+    RAM16K(in=in, load=loadRAM16K, address=address[0..13], out=outRAM16K);
+    
+    // Screen: адреса 16384-24575 (address[14]=1, address[13]=0)
+    And(a=address[14], b=not13, out=screenCondition);
+    And(a=load, b=screenCondition, out=loadScreen);
+    Screen(in=in, load=loadScreen, address=address[0..12], out=outScreen);
+    
+    // Keyboard: адрес 24576 (address[14..12]=110 и все младшие биты 0)
+    And(a=address[14], b=address[13], out=keyboardCondition1);
+    And(a=keyboardCondition1, b=not12, out=keyboardCondition);
+    
+    // Проверка, что младшие 12 битов адреса равны 0
+    Or(a=address[0], b=address[1], out=or01);
+    Or(a=or01, b=address[2], out=or02);
+    Or(a=or02, b=address[3], out=or03);
+    Or(a=or03, b=address[4], out=or04);
+    Or(a=or04, b=address[5], out=or05);
+    Or(a=or05, b=address[6], out=or06);
+    Or(a=or06, b=address[7], out=or07);
+    Or(a=or07, b=address[8], out=or08);
+    Or(a=or08, b=address[9], out=or09);
+    Or(a=or09, b=address[10], out=or10);
+    Or(a=or10, b=address[11], out=anyLow12);
+    Not(in=anyLow12, out=allZeroLow12);
+    
+    And(a=keyboardCondition, b=allZeroLow12, out=keyboardSel);
+    Keyboard(out=outKeyboard);
+    
+    // RAM4K: адреса 28672-32767 (address[14..12]=111)
+    And(a=address[14], b=address[13], out=ram4kCondition1);
+    And(a=ram4kCondition1, b=address[12], out=ram4kCondition);
+    And(a=load, b=ram4kCondition, out=loadRAM4K);
+    RAM4K(in=in, load=loadRAM4K, address=address[0..11], out=outRAM4K);
+    
+    // Мультиплексирование выходов - исправленная логика
+    Mux16(a=outKeyboard, b=outRAM4K, sel=address[12], out=outSegment67);
+    Mux16(a=outScreen, b=outSegment67, sel=address[13], out=outSegment47);
+    Mux16(a=outRAM16K, b=outSegment47, sel=address[14], out=out);
+}
